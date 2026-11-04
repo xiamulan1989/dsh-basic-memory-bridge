@@ -448,6 +448,60 @@ test('completed turns enqueue one background capture with final texts only', asy
   assert.match(llm.calls[0].messages[0].content[0].text, /Noted\./);
 });
 
+test('only high-confidence pure small-talk turns skip background capture', async () => {
+  const cases = [
+    { group: 'SKIP', text: '你好' },
+    { group: 'SKIP', text: '您好' },
+    { group: 'SKIP', text: '嗨' },
+    { group: 'SKIP', text: '早上好' },
+    { group: 'SKIP', text: '晚上好' },
+    { group: 'SKIP', text: '谢谢' },
+    { group: 'SKIP', text: '谢谢你' },
+    { group: 'SKIP', text: '感谢' },
+    { group: 'SKIP', text: '再见' },
+    { group: 'SKIP', text: '拜拜' },
+    { group: 'SKIP', text: '哈哈哈哈' },
+    { group: 'CAPTURE', text: '记住我喜欢白茶' },
+    { group: 'CAPTURE', text: '我最近换了新工作' },
+    { group: 'CAPTURE', text: '我的长期偏好是用简体中文交流' },
+    { group: 'CAPTURE', text: '我已经决定每周跑步三次' },
+    { group: 'CAPTURE', text: '以后请称呼我为小玉子' },
+    { group: 'UNCERTAIN', text: '好的' },
+    { group: 'UNCERTAIN', text: '可以' },
+    { group: 'UNCERTAIN', text: '收到' },
+    { group: 'UNCERTAIN', text: '继续吧' },
+    { group: 'UNCERTAIN', text: '嗯' },
+    { group: 'UNCERTAIN', text: '是的' },
+    { group: 'UNCERTAIN', text: '记得' },
+    { group: 'UNCERTAIN', text: '好' },
+    { group: 'UNCERTAIN', text: '哈哈' },
+    { group: 'UNCERTAIN', text: '哈哈哈' },
+    { group: 'UNCERTAIN', text: '谢谢，顺便记住我喜欢白茶' },
+    { group: 'UNCERTAIN', text: '你好，帮我看看这个问题' },
+    { group: 'UNCERTAIN', text: '我最近换了新工作，你觉得怎么样？' },
+    { group: 'UNCERTAIN', text: '你好吗？' },
+    { group: 'UNCERTAIN', text: '你好？' },
+    { group: 'UNCERTAIN', text: '你好🙂' },
+    { group: 'UNCERTAIN', text: '谢谢！🙂' },
+  ];
+
+  assert.deepEqual(
+    Object.fromEntries(['SKIP', 'CAPTURE', 'UNCERTAIN'].map(group => [
+      group, cases.filter(item => item.group === group).length,
+    ])),
+    { SKIP: 11, CAPTURE: 5, UNCERTAIN: 17 },
+  );
+
+  const { bridge, llm } = makeBridge();
+  let expectedCalls = 0;
+  for (const [index, item] of cases.entries()) {
+    await emitTurn(bridge, { turn: index + 1, userText: item.text });
+    if (item.group !== 'SKIP') expectedCalls++;
+    assert.equal(llm.calls.length, expectedCalls, item.group + ': ' + item.text);
+  }
+  assert.equal(llm.calls.length, 22);
+});
+
 test('capture passes the current user message id and event sequence into memory sources', async () => {
   const { bridge, writes } = makeBridge();
   await emitTurn(bridge, { turn: 1, messageId: 'msg-77', eventSeq: 77 });
